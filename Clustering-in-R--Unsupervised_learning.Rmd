@@ -1,0 +1,358 @@
+---
+title: "The Kira Plastinina Brand."
+subtitle: "An Unsupervised Learning Approach in Clustering"
+author: "Joseph Kirika"
+date: "08/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Defining the Question
+
+### a) Specifying the Question
+
+* To learn the characteristics of customer groups.
+
+### b) Defining the Metric for Success
+
+Perform clustering stating insights drawn from your analysis and visualizations.  
+Upon implementation, provide comparisons between K-Means clustering vs Hierarchical clustering highlighting the strengths
+and limitations of each approach in the context of the analysis.
+
+### c) Understanding the context
+
+Kira Plastinina (Russian: Ки́ра Серге́евна Пласти́нина) is a Russian fashion designer and entrepreneur. Her brand was sold through a now defunct chain of eponymous retail stores in Russia, Ukraine, Kazakhstan, Belarus, China, Philippines and Armenia.We are required to understand the brand customer’s behavior from data they collected over an year.
+
+### d) Recording the Experimental Design
+
+* Reading the dataset
+* Cleanig and dealing with anomalies to ensure that the quality of the data is upto the task
+* Exploring the given dataset using univariate and bivariate techniques
+* Highlighting the insights given
+* Implementing the solution through K means and Hierarchical clustering
+* Attempting to challenge the solutions given
+* Providing some conclusions and recommendations
+
+### e) Data Relevance
+The data relevance ought to be evaluated against the metric of success after analysis.The dataset consists of 10 numerical and 8 categorical attributes.  
+The following is a list of variable names describing the dataset given:   
+
+* The **'Revenue'** attribute can be used as the class label.
+
+* **"Administrative"**, **"Administrative Duration"**, **"Informational"**, **"Informational Duration"**, **"Product Related"** and **"Product Related Duration"** represents the number of different types of pages visited by the visitor in that session and total time spent in each of these page categories. The values of these features are derived from the URL information of the pages visited by the user and updated in real-time when a user takes an action, e.g. moving from one page to another.  
+
+* The **"Bounce Rate"**, **"Exit Rate"** and **"Page Value"** features represent the metrics measured by "Google Analytics" for each page in the e-commerce site. The value of the **"Bounce Rate"** feature for a web page refers to the percentage of visitors who enter the site from that page and then leave ("bounce") without triggering any other requests to the analytics server during that session. The value of the **"Exit Rate"** feature for a specific web page is calculated as for all pageviews to the page, the percentage that was the last in the session.The **"Page Value"** feature represents the average value for a web page that a user visited before completing an e-commerce transaction.   
+
+* The **"Special Day"** feature indicates the closeness of the site visiting time to a specific special day (e.g. Mother’s Day, Valentine's Day) in which the sessions are more likely to be finalized with the transaction. The value of this attribute is determined by considering the dynamics of e-commerce such as the duration between the order date and delivery date. For example, for Valentina’s day, this value takes a nonzero value between February 2 and February 12, zero before and after this date unless it is close to another special day, and its maximum value of 1 on February 8.   
+
+* The dataset also includes the **operating system**, **browser**, **region**, **traffic type**, **visitor type** as returning or new visitor, a Boolean value indicating whether the date of the visit is **weekend**, and **month** of the year.
+
+
+## Importing And Previewing The Data 
+
+### Importing the data
+```{r}
+# importing the data
+df<-read.csv("http://bit.ly/EcommerceCustomersDataset")
+```
+
+### Previewing the data
+```{r}
+#checking the top rows of our dataset
+print(head(df))
+
+#checking the bottom rows of our dataset
+print(tail(df))
+```
+```{r}
+# checking the structure of the dataset
+str(df)
+```
+
+## Data Cleaning
+```{r}
+#editing the column names to lowercase 
+names(df) <- tolower(names(df))
+names(df)
+```
+```{r}
+#check for nulls
+colSums(is.na(df))
+```
+```{r}
+# using amelia function to check to what extent the null values occur in the dataset
+library(Amelia)
+df.out <- amelia(x = df,m = 5, p2s = 0, noms = c("month", "visitortype"))
+summary(df.out)
+```
+> the fraction of missing data is minute and omitting their rows would not loss of significant information                     
+
+```{r}
+# dropping the null columns
+df<-na.omit(df)
+```
+```{r}
+#check for nulls
+colSums(is.na(df))
+```
+
+```{r}
+# Checking for duplicated data
+dim(df[duplicated(df), ])
+```
+> the data has duplicated data    
+
+```{r}
+# dropping duplicate
+df <- df[!duplicated(df), ]
+
+# checking the dimensions of the remaining data
+dim(df)
+```
+
+```{r}
+# check for outliers/anomalies
+
+# Finding all columns that are numerical/not strings & subsetting to new dataframe
+df_num <- df[, !sapply(df, is.character)]
+# ad_num <- subset(ad_num,select = -c(male, clicked_on_ad, area_income))
+boxplot(df_num, main='BoxPlots')
+```
+> There are outliers in all the numerical columns.for now, no outliers are to be dropped  
+
+## Exploratory Data Analysis
+
+```{r}
+# plotting barplots on the categorical columns
+par(mfrow = c(2,3), mar = c(5,4,2,2))
+barplot(table(df$revenue),main = "Revenue")
+barplot(table(df$weekend),main = "Weekend")
+barplot(table(df$visitortype),main = "Visitor Type")
+barplot(table(df$traffictype),main = "Traffic Type")
+barplot(table(df$region),main = "Region")
+barplot(table(df$browser),main = "Browser")
+barplot(table(df$month),main = "Month")
+barplot(table(df$operatingsystems),main = "Operating Systems")
+```
+
+> An approximate 2,000 profiles raked in some revenue in the past year.  
+A large proportion logged in during the weekday as compared to the weekend.   
+A large proprtion of our clients are returning visitors followed by new visitors.   
+Traffic type 2 had most clents followed by traffic type 1 and type 3 respectively.  
+A large proportion of the clients hail from regions 1 followed by region 3. Region 2 and 4 showed equal number of clients  
+Most clients showed to have browser type 2 followed by 1  
+Most clients prefer shopping between the the month of March to November with a hike in sales in December  
+Type 2 operating system is the most popular,seemingly there is a tie in popularity of  type 1 and type 3 operating systems  
+
+
+```{r}
+# plotting histograms of the continuous variables
+par(mfrow = c(2,3), mar = c(5,4,2,2))
+hist(df$administrative,xlab ='administrative', main ='Histogram for administrative')
+hist(df$administrative_duration,xlab ='administrative duration', main ='Histogram for administrative duration')
+hist(df$informational,xlab ='informational', main ='Histogram for informational')
+hist(df$informational_duration,xlab ='informational duration', main ='Histogram for informational duration')
+hist(df$productrelated,xlab ='product related', main ='Histogram for product related')
+hist(df$productrelated_duration,xlab ='productrelated_duration', main ='Histogram for productrelated duration')
+hist(df$bouncerates,xlab ='bounce rates', main ='Histogram for bounce rates')
+hist(df$exitrates,xlab ='exit rates', main ='Histogram for exit rates')
+hist(df$pagevalues,xlab ='page values', main ='Histogram for page values')
+hist(df$specialday,xlab ='special day', main ='Histogram for special day')
+```
+>  Distribution for all the numerical columns is not Gaussian   
+Most exit rates are between 0 and 0.05  
+The administartive duration between 0 and 400 has a significant number of online profiles   
+
+```{r}
+library(psych)
+desc <- describe(df)
+desc
+
+```
+the above output shows the distributions the various variables
+```{r}
+library(ggplot2)
+# Basic scatter plot without handling outliers
+ggplot(df, aes(x=bouncerates, y=exitrates)) + geom_point()
+```
+> exitrates and bounce rates shows a positove corrlation  
+
+```{r}
+# Basic scatter plot without handling outliers
+ggplot(df, aes(x=informational_duration, y=administrative_duration)) +
+geom_point()
+```
+>  the length of duration seems to cluster between 0 and 500  
+
+```{r}
+library(ggcorrplot)
+ggcorrplot(cor(df[ , c(1:10)]), type = "lower", outline.col = "black",
+ lab=TRUE,
+ ggtheme = ggplot2::theme_gray,
+ colors = c("#6D9EC1", "white", "#E46726"))
+```
+>  variables with high positive correlataion:  
+* exitrates & bouncerates
+* productrelated & produtrelated_duration 
+* informational &  informational_duration
+* administrative & administartive_duration  
+
+## Implementing The Solution
+### Data preparation
+```{r}
+# dropping the characterised variables 
+df.new<-df[ ,c(1:10,12:15)]
+
+```
+
+```{r}
+# normalizing the data
+normalize <- function(x){
+  return ((x-min(x)) / (max(x)-min(x)))
+}
+
+df.norm <- normalize (df.new)
+```
+
+```{r}
+# this step was added because finding the optimum number of clusters took sometime. therefore taking a random sample of 1500
+rand_df <- df.norm[sample(nrow(df.norm), size=1500), ]
+head(rand_df)
+```
+
+### K means Clustering
+```{r}
+# Loading the required libraries
+library(factoextra)
+library(NbClust)
+library (cluster)
+```
+
+```{r}
+# Elbow method
+fviz_nbclust(rand_df, kmeans, method = "wss") +
+    geom_vline(xintercept = 3, linetype = 2)+
+  labs(subtitle = "Elbow method")
+```
+
+```{r}
+# Silhouette method
+fviz_nbclust(rand_df, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+```
+
+```{r}
+# Gap statistic
+# nboot = 50 to keep the function speedy. 
+
+set.seed(123)
+fviz_nbclust(rand_df, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+  labs(subtitle = "Gap statistic method")
+```
+
+```{r}
+# choosing the best number of clusters
+nb<-NbClust(data = rand_df, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "kmeans")
+
+fviz_nbclust(nb)
+```
+optimal number of clusters is suggested to be 2  
+
+```{r}
+#implementing the Kmeans using 2 clusters as suggested by majority of the methods
+km <- kmeans(df.norm,2,iter.max = 10, nstart = 25)
+km
+```
+
+```{r}
+#plot results of final k-means model
+fviz_cluster(km, data = df.new)
+```
+
+### Hierarchical Clustering
+
+```{r}
+#define linkage methods
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+
+#function to compute agglomerative coefficient
+ac <- function(x) {
+  agnes(rand_df, method = x)$ac
+}
+
+#calculate agglomerative coefficient for each clustering linkage method
+sapply(m, ac)
+```
+selecting the linkage method that has the highest coefficient  
+
+```{r}
+# performing hierarchical clustering using Ward's minimum variance
+clust <- agnes(rand_df, method = "ward")
+
+#produce dendrogram
+pltree(clust, cex = 0.6, hang = -1, main = "Dendrogram") 
+```
+
+```{r}
+#calculate gap statistic for each number of clusters (up to 10 clusters)
+gap_stat <- clusGap(rand_df, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+
+#produce plot of clusters vs. gap statistic
+fviz_gap_stat(gap_stat)
+```
+                        
+i chose a cluster of 3 which gave the lowest Gap statistic
+```{r}
+# Apply Cluster Labels to randomised  Dataset
+#compute distance matrix
+
+#perform hierarchical clustering using Ward's method
+final_clust <- agnes(rand_df,
+                     metric = "euclidean",
+                     method = "ward",
+                     stand = TRUE)
+
+#cut the dendrogram into 4 clusters
+groups <- cutree(final_clust, k=3)
+
+#find number of observations in each cluster
+table(groups)
+
+```
+
+```{r}
+#append cluster labels to original data
+final_data <- cbind(rand_df, cluster = groups)
+
+#display first six rows of final data
+head(final_data)
+```
+
+```{r}
+#find mean values for each cluster
+aggregate(final_data, by=list(cluster=final_data$cluster), mean)
+
+```
+the above dataframe shows the means of the clusters for each variable in the randomised dataset
+
+## Challenging The Solution
+> i would suggest encoding the string categorical columns  
+verifying the models metric distances.
+
+
+## Conclusions and Recommendations  
+It is to be noted that the numerical columns had outliers and that were not Gaussian     
+Traffic type 2 had most clents followed by traffic type 1 and type 3 respectively.  
+A large proportion of the clients hail from regions 1 followed by region 3. Region 2 and 4 showed equal number of clients  
+Most clients showed to have browser type 2 followed by 1  
+Most clients prefer shopping between the the month of March to November with a hike in sales in December  
+Type 2 operating system is the most popular,seemingly there is a tie in popularity of  type 1 and type 3 operating systems 
+exitrates & bouncerates and productrelated & produtrelated_duration variables were highly correlated.        
+K means used 3 clusters  whereas in Hierarchical clustering the cluster to pick was 3.            
+
+
